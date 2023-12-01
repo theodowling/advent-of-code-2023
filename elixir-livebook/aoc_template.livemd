@@ -166,8 +166,8 @@ end
 
 Benchee.run(
   %{
-    "part1" => &Benchmarks.part1/1,
-    "part2" => &Benchmarks.part2/1
+    "dayxx.part1" => &Benchmarks.part1/1,
+    "dayxx.part2" => &Benchmarks.part2/1
   },
   inputs: %{
     "puzzle" => puzzle_input
