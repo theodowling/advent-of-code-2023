@@ -1,0 +1,372 @@
+# Advent of Code - Day 3
+
+```elixir
+Mix.install([
+  {:kino_aoc, "~> 0.1"},
+  # {:benchee, "~> 1.0", only: :dev}
+  {:kino_benchee, github: "akoutmos/kino_benchee", branch: "initial_release_prep"}
+])
+```
+
+## Introduction
+
+### Day 3: Gear Ratios
+
+[https://adventofcode.com/2023/day/3](https://adventofcode.com/2023/day/3)
+
+#### Description
+
+##### Part One
+
+You and the Elf eventually reach a [gondola lift](https://en.wikipedia.org/wiki/Gondola_lift) station; he says the gondola lift will take you up to the _water source_, but this is as far as he can bring you. You go inside.
+
+It doesn't take long to find the gondolas, but there seems to be a problem: they're not moving.
+
+"Aaah!"
+
+You turn around to see a slightly-greasy Elf with a wrench and a look of surprise. "Sorry, I wasn't expecting anyone! The gondola lift isn't working right now; it'll still be a while before I can fix it." You offer to help.
+
+The engineer explains that an engine part seems to be missing from the engine, but nobody can figure out which one. If you can _add up all the part numbers_ in the engine schematic, it should be easy to work out which part is missing.
+
+The engine schematic (your puzzle input) consists of a visual representation of the engine. There are lots of numbers and symbols you don't really understand, but apparently _any number adjacent to a symbol_, even diagonally, is a "part number" and should be included in your sum. (Periods (`.`) do not count as a symbol.)
+
+Here is an example engine schematic:
+
+```
+467..114..
+...*......
+..35..633.
+......#...
+617*......
+.....+.58.
+..592.....
+......755.
+...$.*....
+.664.598..
+```
+
+In this schematic, two numbers are _not_ part numbers because they are not adjacent to a symbol: `114` (top right) and `58` (middle right). Every other number is adjacent to a symbol and so _is_ a part number; their sum is _`4361`_.
+
+Of course, the actual engine schematic is much larger. _What is the sum of all of the part numbers in the engine schematic?_
+
+##### Part Two
+
+The engineer finds the missing part and installs it in the engine! As the engine springs to life, you jump in the closest gondola, finally ready to ascend to the water source.
+
+You don't seem to be going very fast, though. Maybe something is still wrong? Fortunately, the gondola has a phone labeled "help", so you pick it up and the engineer answers.
+
+Before you can explain the situation, she suggests that you look out the window. There stands the engineer, holding a phone in one hand and waving with the other. You're going so slowly that you haven't even left the station. You exit the gondola.
+
+The missing part wasn't the only issue - one of the gears in the engine is wrong. A _gear_ is any `*` symbol that is adjacent to _exactly two part numbers_. Its _gear ratio_ is the result of <span title="They're magic gears.">multiplying</span> those two numbers together.
+
+This time, you need to find the gear ratio of every gear and add them all up so that the engineer can figure out which gear needs to be replaced.
+
+Consider the same engine schematic again:
+
+```
+467..114..
+...*......
+..35..633.
+......#...
+617*......
+.....+.58.
+..592.....
+......755.
+...$.*....
+.664.598..
+```
+
+In this schematic, there are _two_ gears. The first is in the top left; it has part numbers `467` and `35`, so its gear ratio is `16345`. The second gear is in the lower right; its gear ratio is `451490`. (The `*` adjacent to `617` is _not_ a gear because it is only adjacent to one part number.) Adding up all of the gear ratios produces _`467835`_.
+
+_What is the sum of all of the gear ratios in your engine schematic?_
+
+## Puzzle
+
+<!-- livebook:{"attrs":{"assign_to":"puzzle_input","day":"3","session_secret":"AOC_SESSION","year":"2023"},"chunks":null,"kind":"Elixir.KinoAOC.HelperCell","livebook_object":"smart_cell"} -->
+
+```elixir
+{:ok, puzzle_input} =
+  KinoAOC.download_puzzle("2023", "3", System.fetch_env!("LB_AOC_SESSION"))
+```
+
+## Parser
+
+### Code - Parser
+
+```elixir
+defmodule Parser do
+  def parse(input) do
+    symbols =
+      Regex.scan(~r/[^.\d\n]/, input, return: :index)
+      |> Enum.map(fn [{a, _}] -> a + 1 end)
+      |> MapSet.new()
+
+    stars =
+      Regex.scan(~r/[*]/, input, return: :index)
+      |> Enum.map(fn [{a, _}] -> a + 1 end)
+      |> MapSet.new()
+
+    numbers = Regex.scan(~r/\d+/, input) |> Enum.map(&String.to_integer(hd(&1)))
+
+    numbers_index =
+      Regex.scan(~r/\d+/, input, return: :index) |> Enum.map(fn [{a, b}] -> {a + 1, b} end)
+
+    row_count = :math.sqrt(byte_size(input)) |> round()
+    %{count: row_count, symbols: symbols, numbers: Enum.zip(numbers, numbers_index), stars: stars}
+  end
+end
+```
+
+### Tests - Parser
+
+```elixir
+ExUnit.start(autorun: false)
+
+defmodule ParserTest do
+  use ExUnit.Case, async: true
+  import Parser
+
+  @input """
+  467..114..
+  ...*......
+  ..35..633.
+  ......#...
+  617*......
+  .....+.58.
+  ..592.....
+  ......755.
+  ...$.*....
+  .664.598..
+  """
+  @expected %{
+    count: 10,
+    symbols: MapSet.new([15, 40, 48, 61, 92, 94]),
+    numbers: [
+      {467, {1, 3}},
+      {114, {6, 3}},
+      {35, {25, 2}},
+      {633, {29, 3}},
+      {617, {45, 3}},
+      {58, {63, 2}},
+      {592, {69, 3}},
+      {755, {84, 3}},
+      {664, {101, 3}},
+      {598, {105, 3}}
+    ],
+    stars: MapSet.new([15, 48, 94])
+  }
+
+  test "parse test" do
+    actual = parse(@input)
+    assert actual == @expected
+  end
+end
+
+ExUnit.run()
+```
+
+<!-- livebook:{"branch_parent_index":2} -->
+
+## Part One
+
+### Code - Part 1
+
+```elixir
+defmodule PartOne do
+  def solve(input) do
+    IO.puts("--- Part One ---")
+    IO.puts("Result: #{run(input)}")
+  end
+
+  def get_neighbours(start, l, count) do
+    x1 = start
+    x2 = x1 + l - 1
+
+    # include neighbours left and right
+    line =
+      cond do
+        rem(x1 - 1, count + 1) == 0 -> Enum.to_list(x1..(x2 + 1))
+        true -> Enum.to_list((x1 - 1)..(x2 + 1))
+      end
+
+    # add above and below
+    line |> Enum.map(fn x -> [x - count - 1, x, x + count + 1] end) |> List.flatten()
+  end
+
+  def run(input) do
+    %{count: count, symbols: symbols, numbers: numbers} = Parser.parse(input)
+
+    Enum.reduce(numbers, 0, fn {number, {start, l}}, acc ->
+      case get_neighbours(start, l, count)
+           |> Enum.any?(fn neighbour ->
+             MapSet.member?(symbols, neighbour)
+           end) do
+        true -> acc + number
+        false -> acc
+      end
+    end)
+  end
+end
+```
+
+### Tests - Part 1
+
+```elixir
+ExUnit.start(autorun: false)
+
+defmodule PartOneTest do
+  use ExUnit.Case, async: true
+  import PartOne
+
+  @input """
+  467..114..
+  ...*......
+  ..35..633.
+  ......#...
+  617*......
+  .....+.58.
+  ..592.....
+  ......755.
+  ...$.*....
+  .664.598..
+  """
+  @expected 4361
+
+  test "part one" do
+    actual = run(@input)
+    assert actual == @expected
+  end
+end
+
+ExUnit.run()
+```
+
+### Solution - Part 1
+
+```elixir
+PartOne.solve(puzzle_input)
+```
+
+<!-- livebook:{"branch_parent_index":2} -->
+
+## Part Two
+
+### Code - Part 2
+
+```elixir
+defmodule PartTwo do
+  def solve(input) do
+    IO.puts("--- Part Two ---")
+    IO.puts("Result: #{run(input)}")
+  end
+
+  def get_neighbours(start, l, count) do
+    x1 = start
+    x2 = x1 + l - 1
+
+    # include neighbours left and right
+    line =
+      cond do
+        rem(x1 - 1, count + 1) == 0 -> Enum.to_list(x1..(x2 + 1))
+        true -> Enum.to_list((x1 - 1)..(x2 + 1))
+      end
+
+    # add above and below
+    line |> Enum.map(fn x -> [x - count - 1, x, x + count + 1] end) |> List.flatten()
+  end
+
+  def run(input) do
+    %{count: count, stars: stars, numbers: numbers} = Parser.parse(input)
+
+    stars
+    |> MapSet.to_list()
+    |> Enum.reduce(0, fn star, acc ->
+      coordinates = get_neighbours(star, 1, count)
+
+      linked_numbers =
+        Enum.map(numbers, fn {number, {start, len}} ->
+          if Enum.any?(start..(start + len - 1), &(&1 in coordinates)) do
+            number
+          else
+            nil
+          end
+        end)
+        |> Enum.reject(&is_nil/1)
+
+      case linked_numbers do
+        [a, b] -> acc + a * b
+        _ -> acc
+      end
+    end)
+  end
+end
+```
+
+### Tests - Part 2
+
+```elixir
+ExUnit.start(autorun: false)
+
+defmodule PartTwoTest do
+  use ExUnit.Case, async: true
+  import PartTwo
+
+  @input """
+  467..114..
+  ...*......
+  ..35..633.
+  ......#...
+  617*......
+  .....+.58.
+  ..592.....
+  ......755.
+  ...$.*....
+  .664.598..
+  """
+  @expected 467_835
+
+  test "part two" do
+    actual = run(@input)
+    assert actual == @expected
+  end
+end
+
+ExUnit.run()
+```
+
+### Solution - Part 2
+
+```elixir
+PartTwo.solve(puzzle_input)
+```
+
+<!-- livebook:{"branch_parent_index":2} -->
+
+## Benchmarking
+
+```elixir
+defmodule Benchmarks do
+  def part1(input) do
+    PartOne.run(input)
+  end
+
+  def part2(input) do
+    PartTwo.run(input)
+  end
+end
+
+Benchee.run(
+  %{
+    "day03.part1" => &Benchmarks.part1/1,
+    "day03.part2" => &Benchmarks.part2/1
+  },
+  inputs: %{
+    "puzzle" => puzzle_input
+  },
+  time: 1,
+  memory_time: 1,
+  reduction_time: 1
+)
+```
+
+<!-- livebook:{"offset":8922,"stamp":{"token":"XCP.Nf6A_NPpVk6uAhf1C17HIRkqavdfTyPzzb--t3lL0ZisRBrplvMYchGvkMWKDD_Xl2Lfwnx_7a26UZgwVR2UF76O1jYwyMhQZx0-unjJowxWYFd1jaA","version":2}} -->
