@@ -1,0 +1,270 @@
+# Advent of Code - Day 4
+
+```elixir
+Mix.install([
+  {:kino_aoc, "~> 0.1"},
+  # {:benchee, "~> 1.0", only: :dev}
+  {:kino_benchee, github: "akoutmos/kino_benchee", branch: "initial_release_prep"}
+])
+```
+
+## Introduction
+
+## Puzzle
+
+<!-- livebook:{"attrs":{"assign_to":"puzzle_input","day":"4","session_secret":"AOC_SESSION","year":"2023"},"chunks":null,"kind":"Elixir.KinoAOC.HelperCell","livebook_object":"smart_cell"} -->
+
+```elixir
+{:ok, puzzle_input} =
+  KinoAOC.download_puzzle("2023", "4", System.fetch_env!("LB_AOC_SESSION"))
+```
+
+## Parser
+
+### Code - Parser
+
+```elixir
+defmodule Parser do
+  def parse(input) do
+    input
+    |> String.split("\n", trim: true)
+    |> Enum.map(fn line ->
+      [card, play, win] = String.split(line, ["Card ", ": ", " | "], trim: true)
+
+      %{
+        card: card |> String.trim() |> String.to_integer(),
+        play: play |> String.split(" ", trim: true) |> Enum.map(&String.to_integer/1),
+        win: win |> String.split(" ", trim: true) |> Enum.map(&String.to_integer/1)
+      }
+    end)
+  end
+end
+```
+
+### Tests - Parser
+
+```elixir
+ExUnit.start(autorun: false)
+
+defmodule ParserTest do
+  use ExUnit.Case, async: true
+  import Parser
+
+  @input """
+  Card 1: 41 48 83 86 17 | 83 86  6 31 17  9 48 53
+  Card 2: 13 32 20 16 61 | 61 30 68 82 17 32 24 19
+  Card 3:  1 21 53 59 44 | 69 82 63 72 16 21 14  1
+  Card 4: 41 92 73 84 69 | 59 84 76 51 58  5 54 83
+  Card 5: 87 83 26 28 32 | 88 30 70 12 93 22 82 36
+  Card 6: 31 18 13 56 72 | 74 77 10 23 35 67 36 11
+  """
+  @expected [
+    %{card: 1, play: [41, 48, 83, 86, 17], win: [83, 86, 6, 31, 17, 9, 48, 53]},
+    %{card: 2, play: [13, 32, 20, 16, 61], win: [61, 30, 68, 82, 17, 32, 24, 19]},
+    %{card: 3, play: [1, 21, 53, 59, 44], win: [69, 82, 63, 72, 16, 21, 14, 1]},
+    %{card: 4, play: [41, 92, 73, 84, 69], win: [59, 84, 76, 51, 58, 5, 54, 83]},
+    %{card: 5, play: [87, 83, 26, 28, 32], win: [88, 30, 70, 12, 93, 22, 82, 36]},
+    %{card: 6, play: [31, 18, 13, 56, 72], win: [74, 77, 10, 23, 35, 67, 36, 11]}
+  ]
+
+  test "parse test" do
+    actual = parse(@input)
+    assert actual == @expected
+  end
+end
+
+ExUnit.run()
+```
+
+<!-- livebook:{"branch_parent_index":2} -->
+
+## Part One
+
+### Code - Part 1
+
+```elixir
+defmodule PartOne do
+  def solve(input) do
+    IO.puts("--- Part One ---")
+    IO.puts("Result: #{run(input)}")
+  end
+
+  def derive_card_value(card) do
+    derive_card_value(card.play, card.win, 0)
+  end
+
+  def derive_card_value([], _, 0), do: 0
+  def derive_card_value([], _, acc), do: round(:math.pow(2, acc - 1))
+
+  def derive_card_value([head | tail], win, acc) do
+    if head in win do
+      derive_card_value(tail, win, acc + 1)
+    else
+      derive_card_value(tail, win, acc)
+    end
+  end
+
+  def run(input) do
+    input
+    |> Parser.parse()
+    |> Enum.map(&derive_card_value/1)
+    |> Enum.sum()
+  end
+end
+```
+
+### Tests - Part 1
+
+```elixir
+ExUnit.start(autorun: false)
+
+defmodule PartOneTest do
+  use ExUnit.Case, async: true
+  import PartOne
+
+  @input """
+  Card 1: 41 48 83 86 17 | 83 86  6 31 17  9 48 53
+  Card 2: 13 32 20 16 61 | 61 30 68 82 17 32 24 19
+  Card 3:  1 21 53 59 44 | 69 82 63 72 16 21 14  1
+  Card 4: 41 92 73 84 69 | 59 84 76 51 58  5 54 83
+  Card 5: 87 83 26 28 32 | 88 30 70 12 93 22 82 36
+  Card 6: 31 18 13 56 72 | 74 77 10 23 35 67 36 11
+  """
+  @expected 13
+
+  test "part one" do
+    actual = run(@input)
+    assert actual == @expected
+  end
+end
+
+ExUnit.run()
+```
+
+### Solution - Part 1
+
+```elixir
+PartOne.solve(puzzle_input)
+```
+
+<!-- livebook:{"branch_parent_index":2} -->
+
+## Part Two
+
+### Code - Part 2
+
+```elixir
+defmodule PartTwo do
+  def solve(input) do
+    IO.puts("--- Part Two ---")
+    IO.puts("Result: #{run(input)}")
+  end
+
+  def insert_card_value(card) do
+    value = insert_card_value(card.play, card.win, 0)
+    Map.put(card, :value, value)
+  end
+
+  def insert_card_value([], _, acc), do: acc
+
+  def insert_card_value([head | tail], win, acc) do
+    if head in win do
+      insert_card_value(tail, win, acc + 1)
+    else
+      insert_card_value(tail, win, acc)
+    end
+  end
+
+  def run(input) do
+    input
+    |> Parser.parse()
+    |> Enum.map(&insert_card_value/1)
+    |> Enum.reduce(%{}, fn %{card: i, value: v}, acc ->
+      Enum.reduce(i..(i + v), acc, fn n, acc ->
+        # for each card we always have one of it
+        if i == n do
+          Map.update(acc, n, 1, &(&1 + 1))
+        else
+          Map.update(acc, n, acc[i], &(&1 + acc[i]))
+        end
+      end)
+    end)
+    |> Map.values()
+    |> Enum.sum()
+  end
+end
+
+PartTwo.run("""
+Card 1: 41 48 83 86 17 | 83 86  6 31 17  9 48 53
+Card 2: 13 32 20 16 61 | 61 30 68 82 17 32 24 19
+Card 3:  1 21 53 59 44 | 69 82 63 72 16 21 14  1
+Card 4: 41 92 73 84 69 | 59 84 76 51 58  5 54 83
+Card 5: 87 83 26 28 32 | 88 30 70 12 93 22 82 36
+Card 6: 31 18 13 56 72 | 74 77 10 23 35 67 36 11
+""")
+```
+
+### Tests - Part 2
+
+```elixir
+ExUnit.start(autorun: false)
+
+defmodule PartTwoTest do
+  use ExUnit.Case, async: true
+  import PartTwo
+
+  @input """
+  Card 1: 41 48 83 86 17 | 83 86  6 31 17  9 48 53
+  Card 2: 13 32 20 16 61 | 61 30 68 82 17 32 24 19
+  Card 3:  1 21 53 59 44 | 69 82 63 72 16 21 14  1
+  Card 4: 41 92 73 84 69 | 59 84 76 51 58  5 54 83
+  Card 5: 87 83 26 28 32 | 88 30 70 12 93 22 82 36
+  Card 6: 31 18 13 56 72 | 74 77 10 23 35 67 36 11
+  """
+  @expected 30
+
+  test "part two" do
+    actual = run(@input)
+    assert actual == @expected
+  end
+end
+
+ExUnit.run()
+```
+
+### Solution - Part 2
+
+```elixir
+PartTwo.solve(puzzle_input)
+```
+
+<!-- livebook:{"branch_parent_index":2} -->
+
+## Benchmarking
+
+```elixir
+defmodule Benchmarks do
+  def part1(input) do
+    PartOne.run(input)
+  end
+
+  def part2(input) do
+    PartTwo.run(input)
+  end
+end
+
+Benchee.run(
+  %{
+    "day04.part1" => &Benchmarks.part1/1,
+    "day04.part2" => &Benchmarks.part2/1
+  },
+  inputs: %{
+    "puzzle" => puzzle_input
+  },
+  time: 1,
+  memory_time: 1,
+  reduction_time: 1
+)
+```
+
+<!-- livebook:{"offset":5876,"stamp":{"token":"XCP.zS9t8II-QmjhCUTFFo-t1ORh6OJpaKH0UgAc2oQg_8Lkbfx_iCkNv2WskghDCpQLnOA4vVzfQOjobY7pFYYkxrsRc8lppkvoDzsKDimAG4YCt6ierlw","version":2}} -->
