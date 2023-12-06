@@ -1,0 +1,232 @@
+# Advent of Code - Day 6
+
+```elixir
+Mix.install([
+  {:kino_aoc, "~> 0.1"},
+  # {:benchee, "~> 1.0", only: :dev}
+  {:kino_benchee, github: "akoutmos/kino_benchee", branch: "initial_release_prep"}
+])
+```
+
+## Introduction
+
+## Puzzle
+
+<!-- livebook:{"attrs":{"assign_to":"puzzle_input","day":"6","session_secret":"AOC_SESSION","year":"2023"},"chunks":null,"kind":"Elixir.KinoAOC.HelperCell","livebook_object":"smart_cell"} -->
+
+```elixir
+{:ok, puzzle_input} =
+  KinoAOC.download_puzzle("2023", "6", System.fetch_env!("LB_AOC_SESSION"))
+```
+
+## Parser
+
+### Code - Parser
+
+```elixir
+defmodule Parser do
+  def parse(input, :part1) do
+    input
+    |> String.split("\n", trim: true)
+    |> Enum.map(fn line ->
+      [_ | rounds] = line |> String.split([" ", ":"], trim: true)
+      rounds |> Enum.map(&String.to_integer/1)
+    end)
+    |> Enum.zip()
+  end
+
+  def parse(input, :part2) do
+    input
+    |> String.split("\n", trim: true)
+    |> Enum.map(fn line ->
+      [_ | rounds] = line |> String.split([" ", ":"], trim: true)
+      rounds |> Enum.join("") |> String.to_integer()
+    end)
+    |> List.to_tuple()
+  end
+end
+```
+
+### Tests - Parser
+
+```elixir
+ExUnit.start(autorun: false)
+
+defmodule ParserTest do
+  use ExUnit.Case, async: true
+  import Parser
+
+  @input """
+  Time:      7  15   30
+  Distance:  9  40  200
+  """
+  @expected_1 [{7, 9}, {15, 40}, {30, 200}]
+  @expected_2 {71530, 940_200}
+
+  test "parse test part1" do
+    actual = parse(@input, :part1)
+    assert actual == @expected_1
+  end
+
+  test "parse test part2" do
+    actual = parse(@input, :part2)
+    assert actual == @expected_2
+  end
+end
+
+ExUnit.run()
+```
+
+<!-- livebook:{"branch_parent_index":2} -->
+
+## Part One
+
+### Code - Part 1
+
+```elixir
+defmodule PartOne do
+  def solve(input) do
+    IO.puts("--- Part One ---")
+    IO.puts("Result: #{run(input)}")
+  end
+
+  def run(input) do
+    input
+    |> Parser.parse(:part1)
+    |> Enum.map(fn {duration, record} ->
+      1..(duration - 1)
+      |> Stream.map(fn press_duration ->
+        speed = press_duration
+        remaining_duration = duration - press_duration
+
+        speed * remaining_duration
+      end)
+      |> Stream.reject(&(&1 <= record))
+      |> Enum.count()
+    end)
+    |> Enum.product()
+  end
+end
+```
+
+### Tests - Part 1
+
+```elixir
+ExUnit.start(autorun: false)
+
+defmodule PartOneTest do
+  use ExUnit.Case, async: true
+  import PartOne
+
+  @input """
+  Time:      7  15   30
+  Distance:  9  40  200
+  """
+  @expected 288
+
+  test "part one" do
+    actual = run(@input)
+    assert actual == @expected
+  end
+end
+
+ExUnit.run()
+```
+
+### Solution - Part 1
+
+```elixir
+PartOne.solve(puzzle_input)
+```
+
+<!-- livebook:{"branch_parent_index":2} -->
+
+## Part Two
+
+### Code - Part 2
+
+```elixir
+defmodule PartTwo do
+  def solve(input) do
+    IO.puts("--- Part Two ---")
+    IO.puts("Result: #{run(input)}")
+  end
+
+  def run(input) do
+    {duration, record} =
+      input
+      |> Parser.parse(:part2)
+
+    1..(duration - 1)
+    |> Stream.map(fn press_duration ->
+      speed = press_duration
+      remaining_duration = duration - press_duration
+
+      speed * remaining_duration
+    end)
+    |> Stream.reject(&(&1 <= record))
+    |> Enum.count()
+  end
+end
+```
+
+### Tests - Part 2
+
+```elixir
+ExUnit.start(autorun: false)
+
+defmodule PartTwoTest do
+  use ExUnit.Case, async: true
+  import PartTwo
+
+  @input """
+  Time:      7  15   30
+  Distance:  9  40  200
+  """
+  @expected 71503
+
+  test "part two" do
+    actual = run(@input)
+    assert actual == @expected
+  end
+end
+
+ExUnit.run()
+```
+
+### Solution - Part 2
+
+```elixir
+PartTwo.solve(puzzle_input)
+```
+
+<!-- livebook:{"branch_parent_index":2} -->
+
+## Benchmarking
+
+```elixir
+defmodule Benchmarks do
+  def part1(input) do
+    PartOne.run(input)
+  end
+
+  def part2(input) do
+    PartTwo.run(input)
+  end
+end
+
+Benchee.run(
+  %{
+    "day06.part1" => &Benchmarks.part1/1,
+    "day06.part2" => &Benchmarks.part2/1
+  },
+  inputs: %{
+    "puzzle" => puzzle_input
+  },
+  time: 1,
+  memory_time: 1,
+  reduction_time: 1
+)
+```
+
+<!-- livebook:{"offset":3983,"stamp":{"token":"XCP.rHEUTBrJG_RBmx0d8vfDnd_-md8iqATs2OjHUwh89PAR4zkHWaUo6Y9gIgptur9R_HRt4149SAjkyKPuNHSknMkZnxES2rz72kJ3PZrf-V8eQIM_JTc","version":2}} -->

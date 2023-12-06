@@ -18,4 +18,6 @@ day04.part1        1.03 K        0.97 ms     ±3.16%        0.96 ms        1.06 
 day04.part2        0.89 K        1.12 ms     ±4.14%        1.11 ms        1.26 ms
 day05.part1        6.24 K       0.160 ms     ±8.90%       0.161 ms        0.20 ms
 day05.part2      0.0945 K       10.58 ms     ±2.26%       10.50 ms       11.18 ms
+day06.part1      157.33 K     0.00636 ms    ±35.86%     0.00600 ms      0.0114 ms
+day06.part2     0.00146 K      685.35 ms     ±3.37%      685.35 ms      701.68 ms - can still be optimised
 ```
