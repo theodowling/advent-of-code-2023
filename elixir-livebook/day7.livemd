@@ -1,0 +1,354 @@
+# Advent of Code - Day 7
+
+```elixir
+Mix.install([
+  {:kino_aoc, "~> 0.1"},
+  # {:benchee, "~> 1.0", only: :dev}
+  {:kino_benchee, github: "akoutmos/kino_benchee", branch: "initial_release_prep"}
+])
+```
+
+## Introduction
+
+## Puzzle
+
+<!-- livebook:{"attrs":{"assign_to":"puzzle_input","day":"7","session_secret":"AOC_SESSION","year":"2023"},"chunks":null,"kind":"Elixir.KinoAOC.HelperCell","livebook_object":"smart_cell"} -->
+
+```elixir
+{:ok, puzzle_input} =
+  KinoAOC.download_puzzle("2023", "7", System.fetch_env!("LB_AOC_SESSION"))
+```
+
+## Parser
+
+### Code - Parser
+
+```elixir
+defmodule Parser do
+  @card_mapping %{
+    :part_1 => %{
+      "A" => 13,
+      "K" => 12,
+      "Q" => 11,
+      "J" => 10,
+      "T" => 9,
+      "9" => 8,
+      "8" => 7,
+      "7" => 6,
+      "6" => 5,
+      "5" => 4,
+      "4" => 3,
+      "3" => 2,
+      "2" => 1
+    },
+    :part_2 => %{
+      "A" => 13,
+      "K" => 12,
+      "Q" => 11,
+      "J" => 0,
+      "T" => 9,
+      "9" => 8,
+      "8" => 7,
+      "7" => 6,
+      "6" => 5,
+      "5" => 4,
+      "4" => 3,
+      "3" => 2,
+      "2" => 1
+    }
+  }
+
+  def parse(input, part \\ :part_1) do
+    input
+    |> String.split("\n", trim: true)
+    |> Enum.map(fn line ->
+      [a, b] = String.split(line, " ", trim: true)
+      {String.graphemes(a) |> Enum.map(&@card_mapping[part][&1]), String.to_integer(b)}
+    end)
+  end
+end
+```
+
+### Tests - Parser
+
+```elixir
+ExUnit.start(autorun: false)
+
+defmodule ParserTest do
+  use ExUnit.Case, async: true
+  import Parser
+
+  @input """
+  32T3K 765
+  T55J5 684
+  KK677 28
+  KTJJT 220
+  QQQJA 483
+  """
+  @expected [
+    {[2, 1, 9, 2, 12], 765},
+    {[9, 4, 4, 10, 4], 684},
+    {[12, 12, 5, 6, 6], 28},
+    {[12, 9, 10, 10, 9], 220},
+    {[11, 11, 11, 10, 13], 483}
+  ]
+
+  test "parse test" do
+    actual = parse(@input, :part_1)
+    assert actual == @expected
+  end
+end
+
+ExUnit.run()
+```
+
+```elixir
+defmodule Hands do
+  def compare({_, score_a, _}, {_, score_b, _}) when score_a > score_b, do: :gt
+  def compare({_, score_a, _}, {_, score_b, _}) when score_a < score_b, do: :lt
+
+  def compare({[a1, a2, a3, a4, a5], eq_score, _}, {[b1, b2, b3, b4, b5], eq_score, _}) do
+    cond do
+      a1 > b1 -> :gt
+      a1 < b1 -> :lt
+      a2 > b2 -> :gt
+      a2 < b2 -> :lt
+      a3 > b3 -> :gt
+      a3 < b3 -> :lt
+      a4 > b4 -> :gt
+      a4 < b4 -> :lt
+      a5 > b5 -> :gt
+      a5 < b5 -> :lt
+      true -> :eq
+    end
+  end
+
+  # five of a kind
+  def score_hand([a, a, a, a, a]), do: 6
+
+  # four of a kind
+  def score_hand([a, a, a, a, _]), do: 5
+  def score_hand([_, e, e, e, e]), do: 5
+
+  # full house
+  def score_hand([a, a, a, e, e]), do: 4
+  def score_hand([a, a, e, e, e]), do: 4
+
+  # three of a kind
+  def score_hand([a, a, a, _, _]), do: 3
+  def score_hand([_, b, b, b, _]), do: 3
+  def score_hand([_, _, c, c, c]), do: 3
+
+  # two pair
+  def score_hand([a, a, b, b, _]), do: 2
+  def score_hand([_, b, b, e, e]), do: 2
+  def score_hand([a, a, _, e, e]), do: 2
+
+  # one pair   
+  def score_hand([a, b, c, d, e])
+      when a == b or b == c or c == d or d == e,
+      do: 1
+
+  def score_hand(_), do: 0
+
+  # sorted so if contains jokers first card will be "J" => 0
+  def assign_jokers([0, 0, 0, 0, a]) do
+    [a, a, a, a, a]
+  end
+
+  # four of a kind is always better - if a and b is the same it will be five of a kind
+  def assign_jokers([0, 0, 0, a, b]) do
+    [a, a, a, a, b]
+  end
+
+  # two jokers
+  def assign_jokers([0, 0, a, a, b]) do
+    [a, a, a, a, b]
+  end
+
+  def assign_jokers([0, 0, a, b, b]) do
+    [a, b, b, b, b]
+  end
+
+  def assign_jokers([0, 0, a, b, c]) do
+    [a, a, a, b, c]
+  end
+
+  # one joker
+  def assign_jokers([0, a, a, a, b]), do: [a, a, a, a, b]
+  def assign_jokers([0, a, a, b, b]), do: [a, a, a, b, b]
+  def assign_jokers([0, a, a, b, c]), do: [a, a, a, b, c]
+  def assign_jokers([0, a, b, b, b]), do: [b, b, b, b, a]
+  def assign_jokers([0, a, b, b, c]), do: [b, b, b, a, c]
+  def assign_jokers([0, a, b, c, c]), do: [c, c, c, a, b]
+
+  def assign_jokers([0, a, b, c, d]), do: [a, a, b, c, d]
+  def assign_jokers(hand), do: hand
+end
+```
+
+<!-- livebook:{"branch_parent_index":2} -->
+
+## Part One
+
+### Code - Part 1
+
+```elixir
+defmodule PartOne do
+  import Hands
+
+  def solve(input) do
+    IO.puts("--- Part One ---")
+    IO.puts("Result: #{run(input)}")
+  end
+
+  def run(input) do
+    input
+    |> Parser.parse(:part_1)
+    |> Stream.map(fn {hand, bid} ->
+      score =
+        hand
+        |> Enum.sort()
+        |> score_hand()
+
+      {hand, score, bid}
+    end)
+    |> Enum.sort_by(& &1, Hands)
+    |> Enum.with_index(1)
+    |> Enum.map(fn {{_, _, bid}, rank} -> bid * rank end)
+    |> Enum.sum()
+  end
+end
+```
+
+### Tests - Part 1
+
+```elixir
+ExUnit.start(autorun: false)
+
+defmodule PartOneTest do
+  use ExUnit.Case, async: true
+  import PartOne
+
+  @input """
+  32T3K 765
+  T55J5 684
+  KK677 28
+  KTJJT 220
+  QQQJA 483
+  """
+  @expected 6440
+
+  test "part one" do
+    actual = run(@input)
+    assert actual == @expected
+  end
+end
+
+ExUnit.run()
+```
+
+### Solution - Part 1
+
+```elixir
+PartOne.solve(puzzle_input)
+```
+
+<!-- livebook:{"branch_parent_index":2} -->
+
+## Part Two
+
+### Code - Part 2
+
+```elixir
+defmodule PartTwo do
+  import Hands
+
+  def solve(input) do
+    IO.puts("--- Part Two ---")
+    IO.puts("Result: #{run(input)}")
+  end
+
+  def run(input) do
+    input
+    |> Parser.parse(:part_2)
+    |> Stream.map(fn {hand, bid} ->
+      score =
+        hand
+        |> Enum.sort()
+        |> assign_jokers()
+        |> score_hand()
+
+      {hand, score, bid}
+    end)
+    |> Enum.sort_by(& &1, Hands)
+    |> Enum.with_index(1)
+    |> Enum.map(fn {{_, _, bid}, rank} -> bid * rank end)
+    |> Enum.sum()
+  end
+end
+```
+
+### Tests - Part 2
+
+```elixir
+ExUnit.start(autorun: false)
+
+defmodule PartTwoTest do
+  use ExUnit.Case, async: true
+  import PartTwo
+
+  @input """
+  32T3K 765
+  T55J5 684
+  KK677 28
+  KTJJT 220
+  QQQJA 483
+  """
+  @expected 5905
+
+  test "part two" do
+    actual = run(@input)
+    assert actual == @expected
+  end
+end
+
+ExUnit.run()
+```
+
+### Solution - Part 2
+
+```elixir
+PartTwo.solve(puzzle_input)
+```
+
+<!-- livebook:{"branch_parent_index":2} -->
+
+## Benchmarking
+
+```elixir
+defmodule Benchmarks do
+  def part1(input) do
+    PartOne.run(input)
+  end
+
+  def part2(input) do
+    PartTwo.run(input)
+  end
+end
+
+Benchee.run(
+  %{
+    "day07.part1" => &Benchmarks.part1/1,
+    "day07.part2" => &Benchmarks.part2/1
+  },
+  inputs: %{
+    "puzzle" => puzzle_input
+  },
+  time: 1,
+  memory_time: 1,
+  reduction_time: 1
+)
+```
+
+<!-- livebook:{"offset":6443,"stamp":{"token":"XCP.8uDw4FCYlH1yH7a6wRMOXF_FBePpiZC-In7qeKHxOeefdl5tgRippdCSJk-4_r0Qlq48kxYpEvTB3aIrb-8iQrvWqApr4XTuHlOOXpDdRbN6gRy1mpM","version":2}} -->
