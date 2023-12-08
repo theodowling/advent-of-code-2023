@@ -1,0 +1,281 @@
+# Advent of Code - Day 8
+
+```elixir
+Mix.install([
+  {:kino_aoc, "~> 0.1"},
+  # {:benchee, "~> 1.0", only: :dev}
+  {:kino_benchee, github: "akoutmos/kino_benchee", branch: "initial_release_prep"}
+])
+```
+
+## Introduction
+
+## Puzzle
+
+<!-- livebook:{"attrs":{"assign_to":"puzzle_input","day":"8","session_secret":"AOC_SESSION","year":"2023"},"chunks":null,"kind":"Elixir.KinoAOC.HelperCell","livebook_object":"smart_cell"} -->
+
+```elixir
+{:ok, puzzle_input} =
+  KinoAOC.download_puzzle("2023", "8", System.fetch_env!("LB_AOC_SESSION"))
+```
+
+## Parser
+
+### Code - Parser
+
+```elixir
+defmodule Parser do
+  def parse(input) do
+    [a | rest] =
+      input
+      |> String.split("\n", trim: true)
+
+    steps = a |> String.graphemes()
+
+    nodes =
+      rest
+      |> Enum.map(fn line ->
+        [start, l, r] = line |> String.split([" = (", ", ", ")"], trim: true)
+        {start, {l, r}}
+      end)
+      |> Enum.into(%{})
+
+    {steps, nodes}
+  end
+end
+```
+
+### Tests - Parser
+
+```elixir
+ExUnit.start(autorun: false)
+
+defmodule ParserTest do
+  use ExUnit.Case, async: true
+  import Parser
+
+  @input """
+  LLR
+
+  AAA = (BBB, BBB)
+  BBB = (AAA, ZZZ)
+  ZZZ = (ZZZ, ZZZ)
+  """
+  @expected {["L", "L", "R"],
+             %{"AAA" => {"BBB", "BBB"}, "BBB" => {"AAA", "ZZZ"}, "ZZZ" => {"ZZZ", "ZZZ"}}}
+
+  test "parse test" do
+    actual = parse(@input)
+    assert actual == @expected
+  end
+end
+
+ExUnit.run()
+```
+
+<!-- livebook:{"branch_parent_index":2} -->
+
+## Part One
+
+### Code - Part 1
+
+```elixir
+defmodule PartOne do
+  def solve(input) do
+    IO.puts("--- Part One ---")
+    IO.puts("Result: #{run(input)}")
+  end
+
+  def run(input) do
+    {steps, nodes} =
+      input
+      |> Parser.parse()
+
+    steps
+    |> Stream.cycle()
+    |> Enum.reduce_while({"AAA", 0}, fn step, {pos, count} ->
+      next =
+        if step == "L" do
+          elem(nodes[pos], 0)
+        else
+          elem(nodes[pos], 1)
+        end
+
+      if next == "ZZZ" do
+        {:halt, count + 1}
+      else
+        {:cont, {next, count + 1}}
+      end
+    end)
+  end
+end
+```
+
+### Tests - Part 1
+
+```elixir
+ExUnit.start(autorun: false)
+
+defmodule PartOneTest do
+  use ExUnit.Case, async: true
+  import PartOne
+
+  @input """
+  LLR
+
+  AAA = (BBB, BBB)
+  BBB = (AAA, ZZZ)
+  ZZZ = (ZZZ, ZZZ)
+  """
+  @expected 6
+
+  test "part one" do
+    actual = run(@input)
+    assert actual == @expected
+  end
+end
+
+ExUnit.run()
+```
+
+### Solution - Part 1
+
+```elixir
+PartOne.solve(puzzle_input)
+```
+
+<!-- livebook:{"branch_parent_index":2} -->
+
+## Part Two
+
+### Code - Part 2
+
+```elixir
+defmodule PartTwo do
+  def solve(input) do
+    IO.puts("--- Part Two ---")
+    IO.puts("Result: #{run(input)}")
+  end
+
+  def lcm_all(numbers) do
+    numbers
+    |> Enum.reduce(1, fn n, acc ->
+      lcm(n, acc)
+    end)
+  end
+
+  def lcm(a, b) do
+    if a == 0 or b == 0 do
+      0
+    else
+      div(a * b, gcd(a, b))
+    end
+  end
+
+  def gcd(a, b) do
+    if b == 0 do
+      a
+    else
+      gcd(b, rem(a, b))
+    end
+  end
+
+  def run(input) do
+    {steps, nodes} =
+      input
+      |> Parser.parse()
+
+    nodes
+    |> Enum.filter(fn {k, _} -> binary_part(k, 2, 1) == "A" end)
+    |> Enum.map(&elem(&1, 0))
+    |> Enum.map(fn start ->
+      steps
+      |> Stream.cycle()
+      |> Enum.reduce_while({start, 0}, fn step, {pos, count} ->
+        next =
+          if step == "L" do
+            elem(nodes[pos], 0)
+          else
+            elem(nodes[pos], 1)
+          end
+
+        if binary_part(next, 2, 1) == "Z" do
+          {:halt, count + 1}
+        else
+          {:cont, {next, count + 1}}
+        end
+      end)
+    end)
+    |> lcm_all()
+  end
+end
+```
+
+### Tests - Part 2
+
+```elixir
+ExUnit.start(autorun: false)
+
+defmodule PartTwoTest do
+  use ExUnit.Case, async: true
+  import PartTwo
+
+  @input """
+  LR
+
+  11A = (11B, XXX)
+  11B = (XXX, 11Z)
+  11Z = (11B, XXX)
+  22A = (22B, XXX)
+  22B = (22C, 22C)
+  22C = (22Z, 22Z)
+  22Z = (22B, 22B)
+  XXX = (XXX, XXX)
+  """
+  @expected 6
+
+  test "part two" do
+    actual = run(@input)
+    assert actual == @expected
+  end
+end
+
+ExUnit.run()
+```
+
+### Solution - Part 2
+
+```elixir
+PartTwo.solve(puzzle_input)
+```
+
+<!-- livebook:{"branch_parent_index":2} -->
+
+## Benchmarking
+
+```elixir
+defmodule Benchmarks do
+  def part1(input) do
+    PartOne.run(input)
+  end
+
+  def part2(input) do
+    PartTwo.run(input)
+  end
+end
+
+Benchee.run(
+  %{
+    "day08.part1" => &Benchmarks.part1/1,
+    "day08.part2" => &Benchmarks.part2/1
+  },
+  inputs: %{
+    "puzzle" => puzzle_input
+  },
+  time: 1,
+  memory_time: 1,
+  reduction_time: 1
+)
+```
+
+<!-- livebook:{"offset":4494,"stamp":{"token":"XCP.Zt0lgcJ13Jf8ifkF5qKGoxXtqKJ8B0kSHE-qBrIp4i-KCeIj7F1odwtCWy-yAbEL7_wMKSCdpzJfUFgIuURVctHjKXcEmWrtoS8ZZ5X3aKao6cjytbw","version":2}} -->
