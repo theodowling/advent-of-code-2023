@@ -1,0 +1,255 @@
+# Advent of Code - Day 9
+
+```elixir
+Mix.install([
+  {:kino_aoc, "~> 0.1"},
+  # {:benchee, "~> 1.0", only: :dev}
+  {:kino_benchee, github: "akoutmos/kino_benchee", branch: "initial_release_prep"}
+])
+```
+
+## Introduction
+
+## Puzzle
+
+<!-- livebook:{"attrs":{"assign_to":"puzzle_input","day":"9","session_secret":"AOC_SESSION","year":"2023"},"chunks":null,"kind":"Elixir.KinoAOC.HelperCell","livebook_object":"smart_cell"} -->
+
+```elixir
+{:ok, puzzle_input} =
+  KinoAOC.download_puzzle("2023", "9", System.fetch_env!("LB_AOC_SESSION"))
+```
+
+## Parser
+
+### Code - Parser
+
+```elixir
+defmodule Parser do
+  def parse(input) do
+    input
+    |> String.split("\n", trim: true)
+    |> Enum.map(fn line ->
+      line
+      |> String.split(" ", trim: true)
+      |> Enum.map(&String.to_integer/1)
+    end)
+  end
+end
+```
+
+### Tests - Parser
+
+```elixir
+ExUnit.start(autorun: false)
+
+defmodule ParserTest do
+  use ExUnit.Case, async: true
+  import Parser
+
+  @input """
+  0 3 6 9 12 15
+  1 3 6 10 15 21
+  10 13 16 21 30 45
+  """
+  @expected [
+    [0, 3, 6, 9, 12, 15],
+    [1, 3, 6, 10, 15, 21],
+    [10, 13, 16, 21, 30, 45]
+  ]
+
+  test "parse test" do
+    actual = parse(@input)
+    assert actual == @expected
+  end
+end
+
+ExUnit.run()
+```
+
+```elixir
+defmodule DeltaCalcs do
+  def recursive_deltas(sub_sequence, acc, level) do
+    delta =
+      sub_sequence
+      |> Enum.chunk_every(2, 1)
+      |> Enum.map(fn
+        [a, b] -> a - b
+        [_] -> nil
+      end)
+      |> Enum.reject(&is_nil/1)
+
+    if Enum.all?(delta, &(&1 == 0)) do
+      acc
+    else
+      recursive_deltas(delta, Map.put(acc, level + 1, delta), level + 1)
+    end
+  end
+
+  def forward_calculate_deltas_until_zero(sequence) do
+    sequence_reversed =
+      sequence |> Enum.reverse()
+
+    recursive_deltas(sequence_reversed, %{0 => sequence_reversed}, 0)
+  end
+
+  def backwards_calculate_deltas_until_zero(sequence) do
+    recursive_deltas(sequence, %{0 => sequence}, 0)
+  end
+
+  def extrapolate(deltas) do
+    deltas
+    |> Map.values()
+    |> Enum.map(fn delta -> hd(delta) end)
+    |> Enum.sum()
+  end
+end
+```
+
+<!-- livebook:{"branch_parent_index":2} -->
+
+## Part One
+
+### Code - Part 1
+
+```elixir
+defmodule PartOne do
+  import DeltaCalcs
+
+  def solve(input) do
+    IO.puts("--- Part One ---")
+    IO.puts("Result: #{run(input)}")
+  end
+
+  def run(input) do
+    input
+    |> Parser.parse()
+    |> Enum.map(fn sequence ->
+      sequence
+      |> forward_calculate_deltas_until_zero()
+      |> extrapolate()
+    end)
+    |> Enum.sum()
+  end
+end
+```
+
+### Tests - Part 1
+
+```elixir
+ExUnit.start(autorun: false)
+
+defmodule PartOneTest do
+  use ExUnit.Case, async: true
+  import PartOne
+
+  @input """
+  0 3 6 9 12 15
+  1 3 6 10 15 21
+  10 13 16 21 30 45
+  """
+  @expected 114
+
+  test "part one" do
+    actual = run(@input)
+    assert actual == @expected
+  end
+end
+
+ExUnit.run()
+```
+
+### Solution - Part 1
+
+```elixir
+PartOne.solve(puzzle_input)
+```
+
+<!-- livebook:{"branch_parent_index":2} -->
+
+## Part Two
+
+### Code - Part 2
+
+```elixir
+defmodule PartTwo do
+  import DeltaCalcs
+
+  def solve(input) do
+    IO.puts("--- Part Two ---")
+    IO.puts("Result: #{run(input)}")
+  end
+
+  def run(input) do
+    input
+    |> Parser.parse()
+    |> Enum.map(fn sequence ->
+      sequence
+      |> backwards_calculate_deltas_until_zero()
+      |> extrapolate()
+    end)
+    |> Enum.sum()
+  end
+end
+```
+
+### Tests - Part 2
+
+```elixir
+ExUnit.start(autorun: false)
+
+defmodule PartTwoTest do
+  use ExUnit.Case, async: true
+  import PartTwo
+
+  @input """
+  0 3 6 9 12 15
+  1 3 6 10 15 21
+  10 13 16 21 30 45
+  """
+  @expected 2
+
+  test "part two" do
+    actual = run(@input)
+    assert actual == @expected
+  end
+end
+
+ExUnit.run()
+```
+
+### Solution - Part 2
+
+```elixir
+PartTwo.solve(puzzle_input)
+```
+
+<!-- livebook:{"branch_parent_index":2} -->
+
+## Benchmarking
+
+```elixir
+defmodule Benchmarks do
+  def part1(input) do
+    PartOne.run(input)
+  end
+
+  def part2(input) do
+    PartTwo.run(input)
+  end
+end
+
+Benchee.run(
+  %{
+    "day09.part1" => &Benchmarks.part1/1,
+    "day09.part2" => &Benchmarks.part2/1
+  },
+  inputs: %{
+    "puzzle" => puzzle_input
+  },
+  time: 1,
+  memory_time: 1,
+  reduction_time: 1
+)
+```
+
+<!-- livebook:{"offset":4144,"stamp":{"token":"XCP.euL0-fnSY81FNxGH0Va2UUtoQTyatnuTvbeK8IwDf3tKJkqHZnxnGdDsByDlgcDY_d6sGGnVmlJQEmlfg9RWEkhWLSRa3yNftgk5hW_tB4AmROlUZ8w","version":2}} -->
