@@ -1,0 +1,347 @@
+# Advent of Code - Day 12
+
+```elixir
+Mix.install([
+  {:kino_aoc, "~> 0.1"},
+  # {:benchee, "~> 1.0", only: :dev}
+  {:kino_benchee, github: "akoutmos/kino_benchee", branch: "initial_release_prep"},
+  {:memoize, "~> 1.4"}
+])
+```
+
+## Introduction
+
+## Puzzle
+
+<!-- livebook:{"attrs":{"assign_to":"puzzle_input","day":"12","session_secret":"AOC_SESSION","year":"2023"},"chunks":null,"kind":"Elixir.KinoAOC.HelperCell","livebook_object":"smart_cell"} -->
+
+```elixir
+{:ok, puzzle_input} =
+  KinoAOC.download_puzzle("2023", "12", System.fetch_env!("LB_AOC_SESSION"))
+```
+
+## Parser
+
+### Code - Parser
+
+```elixir
+defmodule Parser do
+  def parse(input) do
+    input
+    |> String.split("\n", trim: true)
+    |> Enum.map(fn line ->
+      [condition, groups] =
+        line
+        |> String.split(" ", trim: true)
+
+      %{
+        conditions: String.codepoints(condition),
+        groups: groups |> String.split(",", trim: true) |> Enum.map(&String.to_integer/1)
+      }
+    end)
+  end
+end
+```
+
+### Tests - Parser
+
+```elixir
+ExUnit.start(autorun: false)
+
+defmodule ParserTest do
+  use ExUnit.Case, async: true
+  import Parser
+
+  @input """
+  ???.### 1,1,3
+  .??..??...?##. 1,1,3
+  ?#?#?#?#?#?#?#? 1,3,1,6
+  ????.#...#... 4,1,1
+  ????.######..#####. 1,6,5
+  ?###???????? 3,2,1
+  """
+  @expected [
+    %{groups: [1, 1, 3], conditions: ["?", "?", "?", ".", "#", "#", "#"]},
+    %{
+      groups: [1, 1, 3],
+      conditions: [".", "?", "?", ".", ".", "?", "?", ".", ".", ".", "?", "#", "#", "."]
+    },
+    %{
+      groups: [1, 3, 1, 6],
+      conditions: ["?", "#", "?", "#", "?", "#", "?", "#", "?", "#", "?", "#", "?", "#", "?"]
+    },
+    %{
+      groups: [4, 1, 1],
+      conditions: ["?", "?", "?", "?", ".", "#", ".", ".", ".", "#", ".", ".", "."]
+    },
+    %{
+      groups: [1, 6, 5],
+      conditions: [
+        "?",
+        "?",
+        "?",
+        "?",
+        ".",
+        "#",
+        "#",
+        "#",
+        "#",
+        "#",
+        "#",
+        ".",
+        ".",
+        "#",
+        "#",
+        "#",
+        "#",
+        "#",
+        "."
+      ]
+    },
+    %{groups: [3, 2, 1], conditions: ["?", "#", "#", "#", "?", "?", "?", "?", "?", "?", "?", "?"]}
+  ]
+
+  test "parse test" do
+    actual = parse(@input)
+    assert actual == @expected
+  end
+end
+
+ExUnit.run()
+```
+
+<!-- livebook:{"branch_parent_index":2} -->
+
+## Part One
+
+### Code - Part 1
+
+```elixir
+defmodule PartOne do
+  def solve(input) do
+    IO.puts("--- Part One ---")
+    IO.puts("Result: #{run(input)}")
+  end
+
+  def expand_unknown(["?" | rest], acc) do
+    expand_unknown(
+      rest,
+      Enum.map(acc, fn list -> ["." | list] end) ++
+        Enum.map(acc, fn list -> ["#" | list] end)
+    )
+  end
+
+  def expand_unknown([c | rest], acc) do
+    expand_unknown(
+      rest,
+      Enum.map(acc, fn list -> [c | list] end)
+    )
+  end
+
+  def expand_unknown([], acc), do: Enum.map(acc, fn permutation -> Enum.reverse(permutation) end)
+
+  def get_profile(["#" | tail], "#", [h_acc | t_acc]),
+    do: get_profile(tail, "#", [h_acc + 1 | t_acc])
+
+  def get_profile(["#" | tail], _curr, acc),
+    do: get_profile(tail, "#", [1 | acc])
+
+  def get_profile(["." | tail], _curr, acc),
+    do: get_profile(tail, ".", [0 | acc])
+
+  def get_profile([], _curr, acc),
+    do: acc |> Enum.reject(&(&1 == 0)) |> Enum.reverse()
+
+  def count_matches([], _groups, acc), do: acc
+
+  def count_matches([list | rest], groups, acc) do
+    if get_profile(list, "", []) == groups do
+      count_matches(rest, groups, acc + 1)
+    else
+      count_matches(rest, groups, acc)
+    end
+  end
+
+  def run(input) do
+    input
+    |> Parser.parse()
+    |> Enum.map(fn %{groups: groups, conditions: conditions} ->
+      conditions
+      |> expand_unknown([[]])
+      |> count_matches(groups, 0)
+    end)
+    |> Enum.sum()
+  end
+end
+```
+
+### Tests - Part 1
+
+```elixir
+ExUnit.start(autorun: false)
+
+defmodule PartOneTest do
+  use ExUnit.Case, async: true
+  import PartOne
+
+  @input """
+  ???.### 1,1,3
+  .??..??...?##. 1,1,3
+  ?#?#?#?#?#?#?#? 1,3,1,6
+  ????.#...#... 4,1,1
+  ????.######..#####. 1,6,5
+  ?###???????? 3,2,1
+  """
+  @expected 21
+
+  test "part one" do
+    actual = run(@input)
+    assert actual == @expected
+  end
+end
+
+ExUnit.run()
+```
+
+### Solution - Part 1
+
+```elixir
+PartOne.solve(puzzle_input)
+```
+
+<!-- livebook:{"branch_parent_index":2} -->
+
+## Part Two
+
+### Code - Part 2
+
+```elixir
+defmodule PartTwo do
+  use Memoize
+
+  def solve(input) do
+    IO.puts("--- Part Two ---")
+    IO.puts("Result: #{run(input)}")
+  end
+
+  # Strip prepended "." characters
+  defmemo(count_valid([], groups) when length(groups) > 0, do: 0)
+  defmemo(count_valid([], []), do: 1)
+
+  defmemo count_valid(conditions, []) do
+    if Enum.any?(conditions, &(&1 == "#")), do: 0, else: 1
+  end
+
+  defmemo(count_valid(["." | rest], groups),
+    do: count_valid(rest, groups)
+  )
+
+  defmemo count_valid(["?" | rest], groups) do
+    count_valid(["#" | rest], groups) +
+      count_valid(rest, groups)
+  end
+
+  defmemo count_valid(["#" | rest], [len | rest_groups]) do
+    {to_check, remainder} = Enum.split(rest, len - 1)
+
+    cond do
+      length(to_check) != len - 1 ->
+        0
+
+      Enum.any?(to_check, &(&1 == ".")) ->
+        0
+
+      length(remainder) > 0 and hd(remainder) == "#" ->
+        0
+
+      length(remainder) > 0 and hd(remainder) == "?" ->
+        # force ? to become "." to be valid - which we will just absorb
+        # to just skip it and continue
+        count_valid(tl(remainder), rest_groups)
+
+      true ->
+        count_valid(remainder, rest_groups)
+    end
+  end
+
+  def run(input) do
+    result =
+      input
+      |> Parser.parse()
+      |> Enum.map(fn %{groups: groups, conditions: conditions} ->
+        groups = Stream.cycle(groups) |> Enum.take(length(groups) * 5)
+        conditions = Enum.intersperse(List.duplicate(conditions, 5), "?") |> List.flatten()
+        count_valid(conditions, groups)
+      end)
+      |> Enum.sum()
+
+    result
+  end
+end
+```
+
+### Tests - Part 2
+
+```elixir
+ExUnit.start(autorun: false)
+
+defmodule PartTwoTest do
+  use ExUnit.Case, async: true
+  import PartTwo
+
+  @input """
+  ???.### 1,1,3
+  .??..??...?##. 1,1,3
+  ?#?#?#?#?#?#?#? 1,3,1,6
+  ????.#...#... 4,1,1
+  ????.######..#####. 1,6,5
+  ?###???????? 3,2,1
+  """
+  @expected 525_152
+
+  test "part two" do
+    actual = run(@input)
+    assert actual == @expected
+  end
+end
+
+ExUnit.run()
+```
+
+### Solution - Part 2
+
+```elixir
+PartTwo.solve(puzzle_input)
+```
+
+<!-- livebook:{"branch_parent_index":2} -->
+
+## Benchmarking
+
+```elixir
+defmodule Benchmarks do
+  def part1(input) do
+    PartOne.run(input)
+  end
+
+  def part2(input) do
+    PartTwo.run(input)
+    Memoize.invalidate()
+  end
+end
+
+Benchee.run(
+  %{
+    "day12.part1" => &Benchmarks.part1/1,
+    "day12.part2" => &Benchmarks.part2/1
+  },
+  inputs: %{
+    "puzzle" => puzzle_input
+  },
+  time: 1,
+  memory_time: 1,
+  reduction_time: 1
+)
+```
+
+<!-- livebook:{"offset":6826,"stamp":{"token":"XCP.OR3eUWZV__8OUSWhxjewBKEkSVd-pZ8pcMajK8EybIdM12LjzzW9eGkPHmaAouYBEcgpSZQVTs3oq0PhjHP_SPzR-st8udpw23vmGpprEKjddNr8bDU","version":2}} -->
